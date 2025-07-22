@@ -15,6 +15,8 @@ let currentFriend = null;
 
 // --- FRIEND SYSTEM ---
 async function loadFriends() {
+    if (window.friendStatusInterval) clearInterval(window.friendStatusInterval);
+
     const res = await fetch('/api/friends');
     const data = await res.json();
     // Friends
@@ -26,6 +28,8 @@ async function loadFriends() {
         const statusData = await statusRes.json();
 
         const li = document.createElement('li');
+        li.setAttribute('data-friend-id', friend.id);
+
         const avatar = document.createElement('span');
         avatar.className = 'avatar';
         avatar.textContent = getInitials(friend.username);
@@ -89,6 +93,37 @@ async function loadFriends() {
         li.appendChild(nameSpan);
         pendingList.appendChild(li);
     });
+
+      window.friendStatusInterval = setInterval(async () => {
+    // Only update if we have friends displayed
+    const friendList = document.getElementById('friend-list');
+    if (friendList.children.length > 0) {
+      for (const friendElement of friendList.children) {
+        // Extract friend ID from the element's data attribute
+        const friendId = friendElement.getAttribute('data-friend-id');
+        if (friendId) {
+          const statusRes = await fetch(`/api/last_seen?friend_id=${friendId}`);
+          const statusData = await statusRes.json();
+
+          // Update the status indicator
+          const statusIndicator = friendElement.querySelector('.status-indicator');
+          const statusText = friendElement.querySelector('.user-status');
+
+          if (statusIndicator) {
+            statusIndicator.className = `status-indicator ${statusData.status === 'online' ? 'status-online' : 'status-offline'}`;
+          }
+
+          if (statusText) {
+            statusText.innerHTML = `
+              <span class="status-indicator ${statusData.status === 'online' ? 'status-online' : 'status-offline'}"></span>
+              ${statusData.status === 'online' ? 'Online' : statusData.last_seen}
+            `;
+          }
+        }
+      }
+    }
+  }, 10000);
+
 }
 
 // --- SEARCH USERS ---
@@ -133,6 +168,9 @@ async function selectFriend(friend) {
 
     if (window.statusInterval) clearInterval(window.statusInterval);
     window.statusInterval = setInterval(() => updateFriendStatus(friend.id), 30000);
+    document.querySelectorAll('#friend-list li').forEach(li => {
+    li.setAttribute('data-friend-id', friend.id);
+  });
 }
 
 function parseFileMessage(msg) {

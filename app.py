@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory, send_file
-from flask_socketio import SocketIO, emit, join_room
-# from werkzeug.security import generate_password_hash, check_password_hash
+from flask_socketio import SocketIO, emit
 from warborne import WarBorne
 import sqlite3
 import os
@@ -297,6 +296,7 @@ user_sid_map = {}  # user_id: sid
 def on_connect():
     if 'user_id' in session:
         user_id = session['user_id']
+
         user_sid_map[user_id] = request.sid
 
         # Update last seen time when user connects
