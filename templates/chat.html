@@ -12,7 +12,7 @@
 <div class="chat-app">
     <aside class="sidebar">
         <div class="sidebar-header">
-            <span class="user-label"><span class="avatar" id="my-avatar"></span> {{ username }}</span>
+            <span class="user-label"><span class="avatar" id="my-avatar" style="background-image: url('/uploads/{{ profile_picture }}');"></span> {{ username }}</span>
             <div class="sidebar-actions">
                 <button id="theme-toggle" class="theme-toggle" title="Toggle dark/light mode">🌙</button>
                 <a href="/logout" class="logout-btn">Logout</a>
@@ -30,17 +30,44 @@
             <h4>Pending Requests</h4>
             <ul id="pending-requests"></ul>
         </div>
+        <div class="friend-section">
+  <h4>
+    Groups
+    <button id="new-group-btn" title="Create group" style="margin-left:auto;">➕</button>
+  </h4>
+
+  <!-- This <ul> is what chat.js writes into -->
+  <ul id="group-list"></ul>
+</div>
+
+
+
+        <div class="sidebar-footer">
+        <a href="/settings" class="settings-btn">
+            <span class="settings-icon">⚙️</span>
+            <span>Settings</span>
+        </a>
+    </div>
     </aside>
-    <main class="chat-main">
-        <div id="chat-header"></div>
-        <ul id="chat-messages"></ul>
-        <form id="chat-form" autocomplete="off" enctype="multipart/form-data">
-            <input id="message-input" placeholder="Type your message..." autocomplete="off" />
-            <input type="file" id="file-input" style="display:none" />
-            <button type="button" id="attach-btn" title="Attach file">📎</button>
-            <button type="submit">Send</button>
-        </form>
-    </main>
+<main class="chat-main">
+    <div id="chat-header"></div>
+    <ul id="chat-messages"></ul>
+
+    <!-- Add this placeholder div -->
+    <div id="chat-placeholder">
+        <div class="placeholder-content">
+            <div class="app-logo">ChannlX</div>
+            <p>Select a friend to start chatting</p>
+        </div>
+    </div>
+
+    <form id="chat-form" autocomplete="off" enctype="multipart/form-data">
+        <input id="message-input" placeholder="Type your message..." autocomplete="off" />
+        <input type="file" id="file-input" style="display:none" />
+        <button type="button" id="attach-btn" title="Attach file">📎</button>
+        <button type="submit">Send</button>
+    </form>
+</main>
 </div>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script src="/static/chat.js"></script>
