@@ -3,11 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Realtime Chat App</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Neon Auth Portal</title>
+    <link rel="stylesheet" href="/static/auth.css">
 </head>
 <body>
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="/static/chat.js"></script>
+    <!-- Splash Screen -->
+    <div class="splash-screen" id="splashScreen">
+        <div class="splash-content">
+            <div class="logo-container">
+                <h1 class="splash-logo">ChannlX</h1>
+                <div class="splash-subtitle">Welcome to the Future of Communication</div>
+            </div>
+            <div class="loading-container">
+                <div class="loading-bar">
+                    <div class="loading-progress"></div>
+                </div>
+                <div class="loading-text">Loading Experience...</div>
+            </div>
+        </div>
+        <div class="particles-splash"></div>
+    </div>
+
+    <!-- Main Application -->
+    <div class="main-app" id="mainApp">
+        <!-- Animated Background -->
+        <div class="bg-animation">
+            <div class="particles-bg"></div>
+            <div class="gradient-orbs">
+                <div class="orb orb-1"></div>
+                <div class="orb orb-2"></div>
+                <div class="orb orb-3"></div>
+            </div>
+        </div>
+
+        <!-- Auth Container -->
+        <div class="auth-container">
+            <div class="auth-form-wrapper">
+                <!-- Form Toggle -->
+                <div class="form-toggle">
+                    <button class="toggle-btn active" id="loginToggle">Login</button>
+                    <button class="toggle-btn" id="signupToggle">Sign Up</button>
+                    <div class="toggle-indicator"></div>
+                </div>
+
+                <!-- Login Form -->
+                <form class="auth-form login-form active" id="loginForm">
+                    <div class="form-header">
+                        <h2 class="form-title">Welcome Back</h2>
+                        <p class="form-subtitle">Enter your credentials to access your account</p>
+                    </div>
+                    
+<div class="input-group">
+    <input type="text" class="form-input" id="loginEmail" required>
+    <label class="form-label" for="loginEmail">Username</label>
+    <div class="input-glow"></div>
+</div>
+
+                    <div class="input-group">
+                        <input type="password" class="form-input" id="loginPassword" required>
+                        <label class="form-label" for="loginPassword">Password</label>
+                        <button type="button" class="password-toggle" id="loginPasswordToggle">
+                            <span class="eye-icon">👁</span>
+                        </button>
+                        <div class="input-glow"></div>
+                    </div>
+
+                    <div class="form-options">
+                        <label class="checkbox-wrapper">
+                            <input type="checkbox" class="form-checkbox">
+                            <span class="checkmark"></span>
+                            Remember me
+                        </label>
+                        <a href="#" class="forgot-link">Forgot Password?</a>
+                    </div>
+
+                    <button type="submit" class="auth-btn login-btn">
+                        <span class="btn-text">Sign In</span>
+                        <div class="btn-ripple"></div>
+                    </button>
+                </form>
+
+                <!-- Signup Form -->
+                <form class="auth-form signup-form" id="signupForm">
+                    <div class="form-header">
+                        <h2 class="form-title">Create Account</h2>
+                        <p class="form-subtitle">Join us and start your journey</p>
+                    </div>
+
+                    <div class="input-group">
+                        <input type="text" class="form-input" id="signupEmail" required>
+                        <label class="form-label" for="signupEmail">Username</label>
+                        <div class="input-glow"></div>
+                    </div>
+
+                    <div class="input-group">
+                        <input type="password" class="form-input" id="signupPassword" required>
+                        <label class="form-label" for="signupPassword">Password</label>
+                        <button type="button" class="password-toggle" id="signupPasswordToggle">
+                            <span class="eye-icon">👁</span>
+                        </button>
+                        <div class="input-glow"></div>
+                    </div>
+
+                    <div class="input-group">
+                        <input type="password" class="form-input" id="confirmPassword" required>
+                        <label class="form-label" for="confirmPassword">Confirm Password</label>
+                        <div class="input-glow"></div>
+                    </div>
+
+                    <div class="form-options">
+                        <label class="checkbox-wrapper">
+                            <input type="checkbox" class="form-checkbox" required>
+                            <span class="checkmark"></span>
+                            I agree to the <a href="#" class="terms-link">Terms & Conditions</a>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="auth-btn signup-btn">
+                        <span class="btn-text">Create Account</span>
+                        <div class="btn-ripple"></div>
+                    </button>
+                </form>
+
+                <!-- Success/Error Messages -->
+                <div class="message-container" id="messageContainer">
+                    <div class="message" id="message"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/auth.js"></script>
 </body>
-</html> 
+</html>
