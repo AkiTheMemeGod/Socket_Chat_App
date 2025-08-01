@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Chat App</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="settings-page">
+    <header class="settings-header">
+        <h1>Settings</h1>
+        <a href="/" class="back-btn">← Back to Chat</a>
+    </header>
+    <main class="settings-content">
+        <section class="profile-section">
+            <h2>Profile</h2>
+            <form id="profile-form" method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="profile-picture">Profile Picture</label>
+                    <input type="file" id="profile-picture" name="profile_picture" accept="image/*">
+                </div>
+                <button type="submit" class="save-btn">Save Changes</button>
+            </form>
+        </section>
+        <section class="password-section">
+            <h2>Change Password</h2>
+            <form id="password-form" method="POST">
+                <div class="form-group">
+                    <label for="current-password">Current Password</label>
+                    <input type="password" id="current-password" name="current_password" required>
+                </div>
+                <div class="form-group">
+                    <label for="new-password">New Password</label>
+                    <input type="password" id="new-password" name="new_password" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirm-password">Confirm Password</label>
+                    <input type="password" id="confirm-password" name="confirm_password" required>
+                </div>
+                <button type="submit" class="save-btn">Update Password</button>
+            </form>
+        </section>
+    </main>
+</div>
+</body>
+</html>
