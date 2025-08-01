@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory, send_file
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit, join_room
 from warborne import WarBorne
 import sqlite3
 import os
@@ -35,7 +35,8 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-            last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+            last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+            profile_picture TEXT NOT NULL
         )''')
         c.execute('''CREATE TABLE friend (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,6 +52,8 @@ def init_db():
             receiver_id INTEGER NOT NULL,
             message TEXT NOT NULL,
             timestamp DATETIME NOT NULL,
+            read INTEGER DEFAULT 0,
+            read_at DATETIME,
             FOREIGN KEY(sender_id) REFERENCES user(id),
             FOREIGN KEY(receiver_id) REFERENCES user(id)
         )''')
@@ -63,6 +66,33 @@ def init_db():
             timestamp DATETIME NOT NULL,
             FOREIGN KEY(user_id) REFERENCES user(id)
         )''')
+
+        c.execute('''CREATE TABLE "group"
+                     (
+                         id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                         name       TEXT NOT NULL,
+                         owner_id   INTEGER REFERENCES user (id),
+                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                     )''')
+        c.execute('''CREATE TABLE group_member
+                     (
+                         id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                         group_id   INTEGER REFERENCES "group" (id),
+                         user_id    INTEGER REFERENCES user (id),
+                         invited_by INTEGER REFERENCES user (id),
+                         status     TEXT CHECK (status IN ('pending', 'accepted')) DEFAULT 'pending',
+                         joined_at  DATETIME
+                     )''')
+        c.execute('''CREATE TABLE group_message
+                     (
+                         id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                         group_id  INTEGER REFERENCES "group" (id),
+                         sender_id INTEGER REFERENCES user (id),
+                         message   TEXT NOT NULL,
+                         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                     )''')
+
+
         conn.commit()
         conn.close()
 
@@ -79,6 +109,8 @@ def index():
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
+    with open('static/pfp.png', 'rb') as f:
+        pic_data = f.read()
     wb = WarBorne()
     if request.method == 'POST':
         username = request.form['username']
@@ -86,8 +118,9 @@ def signup():
         conn = get_db()
         c = conn.cursor()
         try:
-            c.execute('INSERT INTO user (username, password_hash) VALUES (?, ?)',
-                      (username, wb.wb_hash(password)))
+            c.execute('INSERT INTO user (username, password_hash, profile_picture) VALUES (?, ?, ?)',
+                      (username, wb.wb_hash(password), pic_data))
+            conn.commit()
             conn.commit()
         except sqlite3.IntegrityError:
             return render_template('signup.html', error='Username already exists')
@@ -95,7 +128,7 @@ def signup():
         session['user_id'] = user_id
         session['username'] = username
         return redirect(url_for('index'))
-    return render_template('signup.html')
+    return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -113,7 +146,7 @@ def login():
             return redirect(url_for('index'))
         else:
             return render_template('login.html', error='Invalid credentials')
-    return render_template('login.html')
+    return render_template('index.html')
 
 @app.route('/logout')
 def logout():
@@ -143,7 +176,6 @@ def send_friend_request():
         return jsonify({'error': 'Missing friend_id'}), 400
     conn = get_db()
     c = conn.cursor()
-    # Check if already friends or pending
     c.execute('''SELECT * FROM friend WHERE (user_id=? AND friend_id=?) OR (user_id=? AND friend_id=?)''',
               (session['user_id'], friend_id, friend_id, session['user_id']))
     if c.fetchone():
@@ -248,47 +280,52 @@ def serve_file(file_id):
         as_attachment=False
     )
 
+
 @app.route('/api/chat_history')
 def chat_history():
     if 'user_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
+
     friend_id = request.args.get('friend_id')
     if not friend_id:
-        return jsonify({'messages': []})
+        return jsonify({'error': 'Missing friend_id'}), 400
+
     conn = get_db()
     c = conn.cursor()
-    c.execute('''SELECT m.*, u1.username as sender_name, u2.username as receiver_name FROM message m
-                 JOIN user u1 ON m.sender_id = u1.id
-                 JOIN user u2 ON m.receiver_id = u2.id
-                 WHERE (m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?)
-                 ORDER BY m.timestamp ASC''',
-              (session['user_id'], friend_id, friend_id, session['user_id']))
+    user_id = session['user_id']
+
+    # Get messages with read status - query both directions of conversation
+    c.execute('''
+        SELECT m.*, 
+               sender.username as sender_name, 
+               receiver.username as receiver_name
+        FROM message m
+        JOIN user sender ON m.sender_id = sender.id
+        JOIN user receiver ON m.receiver_id = receiver.id
+        WHERE (m.sender_id = ? AND m.receiver_id = ?) 
+           OR (m.sender_id = ? AND m.receiver_id = ?)
+        ORDER BY m.timestamp ASC
+    ''', (user_id, friend_id, friend_id, user_id))
+
     messages = []
     for row in c.fetchall():
-        # Format timestamp to be more readable
-        timestamp = datetime.strptime(row['timestamp'], '%Y-%m-%d %H:%M:%S')
-        formatted_time = timestamp.strftime('%I:%M %p')  # Format as 12-hour time with AM/PM
+        print(dict(row))
+        messages.append({
+            'id': row['id'],
+            'message': row['message'],
+            'sender': row['sender_name'],
+            'sender_id': row['sender_id'],
+            'receiver': row['receiver_name'],
+            'receiver_id': row['receiver_id'],
+            'timestamp': row['timestamp'],
+            'read': bool(row['read']),
+            'read_at': row['read_at'] if row['read'] else None,
+            #'file_id': row.get('file_id'),
+            #'filetype': row.get('filetype'),
+            #'filename': row.get('filename')
+        })
 
-        msg = row['message']
-        if msg.startswith('[fileid]'):
-            _, rest = msg.split('[fileid]', 1)
-            file_id, filetype, filename = rest.split('|', 2)
-            messages.append({
-                'sender': row['sender_name'],
-                'message': '',
-                'file_id': file_id,
-                'filetype': filetype,
-                'filename': filename,
-                'timestamp': formatted_time
-            })
-        else:
-            messages.append({
-                'sender': row['sender_name'],
-                'message': msg,
-                'timestamp': formatted_time
-            })
     return jsonify({'messages': messages})
-
 # --- SOCKETIO PRIVATE MESSAGING ---
 user_sid_map = {}  # user_id: sid
 
@@ -335,6 +372,8 @@ def handle_private_message(data):
     now = datetime.now()
     timestamp = now.isoformat(sep=' ', timespec='seconds')
     formatted_time = now.strftime('%I:%M %p')
+    print(timestamp)
+    print(formatted_time)
 
     # Save to DB
     conn = get_db()
@@ -347,11 +386,11 @@ def handle_private_message(data):
     if file_id:
         # Save as message with file id
         c.execute('INSERT INTO message (sender_id, receiver_id, message, timestamp) VALUES (?, ?, ?, ?)',
-                  (sender_id, receiver_id, f'[fileid]{file_id}|{filetype}|{filename}', timestamp))
+                  (sender_id, receiver_id, f'[fileid]{file_id}|{filetype}|{filename}', formatted_time))
         conn.commit()
     else:
         c.execute('INSERT INTO message (sender_id, receiver_id, message, timestamp) VALUES (?, ?, ?, ?)',
-                  (sender_id, receiver_id, message, timestamp))
+                  (sender_id, receiver_id, message, formatted_time))
         conn.commit()
 
     # Emit to sender
@@ -423,6 +462,133 @@ def last_seen():
         'timestamp': last_seen_time.strftime('%Y-%m-%d %H:%M:%S')
     })
 # More endpoints for friends, chat, etc. will be added next.
+
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        # Handle profile picture upload
+        if 'profile_picture' in request.files:
+            file = request.files['profile_picture']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
+
+                # Update the user's profile picture in the database
+                conn = get_db()
+                c = conn.cursor()
+                c.execute('UPDATE user SET profile_picture = ? WHERE id = ?', (filename, session['user_id']))
+                conn.commit()
+
+                return redirect(url_for('settings'))
+
+    return render_template('settings.html', username=session['username'])
+
+@app.route('/api/mark_read', methods=['POST'])
+def mark_messages_read():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json()
+    sender_id = data.get('sender_id')
+
+    if not sender_id:
+        return jsonify({'error': 'Missing sender_id'}), 400
+
+    conn = get_db()
+    c = conn.cursor()
+    now = datetime.now().isoformat(sep=' ', timespec='seconds')
+
+    # Mark unread messages as read
+    c.execute('''
+        UPDATE message
+        SET read = 1, read_at = ?
+        WHERE sender_id = ? AND receiver_id = ? AND read = 0
+    ''', (now, sender_id, session['user_id']))
+
+    # Get the number of affected rows
+    updated_rows = c.rowcount
+    conn.commit()
+
+    # Notify sender about read messages if any messages were updated
+    if updated_rows > 0 and sender_id in user_sid_map:
+        socketio.emit('messages_read', {
+            'reader_id': session['user_id'],
+            'timestamp': now
+        }, room=user_sid_map[sender_id])
+
+    return jsonify({'success': True, 'count': updated_rows})
+
+
+
+@socketio.on('group_create')
+def handle_group_create(data):
+    name      = data['name']
+    members   = data['member_ids']           # list[int]
+    owner_id  = session['user_id']
+
+    conn = get_db()
+    cur  = conn.cursor()
+    cur.execute('INSERT INTO "group"(name, owner_id) VALUES (?,?)',
+                (name, owner_id))
+    group_id = cur.lastrowid
+
+    # owner auto-accepts
+    cur.execute('INSERT INTO group_member (group_id,user_id,status,joined_at) '
+                'VALUES (?,?,?,CURRENT_TIMESTAMP)',
+                (group_id, owner_id, 'accepted'))
+
+    # invite friends
+    for uid in members:
+        cur.execute('INSERT INTO group_member (group_id,user_id,invited_by) '
+                    'VALUES (?,?,?)', (group_id, uid, owner_id))
+        if uid in user_sid_map:                      # friend is on-line
+            socketio.emit('group_invite',
+                          {'group_id': group_id, 'group_name': name,
+                           'inviter': session["username"]},
+                          room=user_sid_map[uid])
+
+    conn.commit()
+    join_room(f'group_{group_id}')
+    emit('group_created', {'group_id': group_id})
+
+@socketio.on('group_accept')
+def handle_group_accept(data):
+    gid  = data['group_id']
+    uid  = session['user_id']
+    conn = get_db(); cur = conn.cursor()
+
+    cur.execute('UPDATE group_member SET status="accepted", '
+                'joined_at=CURRENT_TIMESTAMP '
+                'WHERE group_id=? AND user_id=? AND status="pending"',
+                (gid, uid))
+    if cur.rowcount:
+        join_room(f'group_{gid}')
+        socketio.emit('member_joined',
+                      {'user': session['username'], 'uid': uid},
+                      room=f'group_{gid}')
+        conn.commit()
+
+@socketio.on('group_message')
+def handle_group_message(data):
+    gid     = data['group_id']
+    msg     = data['message']
+    sender  = session['user_id']
+    conn    = get_db(); cur=conn.cursor()
+
+    cur.execute('INSERT INTO group_message(group_id,sender_id,message) '
+                'VALUES (?,?,?)', (gid, sender, msg))
+    conn.commit()
+
+    emit('group_message',
+         {'group_id': gid,
+          'sender': session["username"],
+          'message': msg,
+          'timestamp': datetime.now().strftime('%I:%M %p')},
+         room=f'group_{gid}')
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)
